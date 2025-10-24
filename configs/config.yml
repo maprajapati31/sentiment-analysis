@@ -1,0 +1,8 @@
+keywords:
+  - nvidia
+  - jensen huang
+lang: "en"
+max_results: 100
+days: 1
+output_dir: "data/raw"
+
