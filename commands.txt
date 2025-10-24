@@ -1,0 +1,5 @@
+- use this code in linux terminal to copy it to local system:
+  cp data/processed/sentiment_distribution.png /mnt/c/Users/<your_windows_username>/Desktop/
+- use this command to activate the latest env :
+  source venv310/bin/activate
+- 

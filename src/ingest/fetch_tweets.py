@@ -1,70 +1,47 @@
-import os
-import time
+#print("Before import snscrape")
+#import snscrape
+#print("snscrape imported successfully")
+#import snscrape.modules.twitter as sntwitter !! this method throws error!!
+# sntwitter = importlib.import_module("snscrape.modules.twitter")
+# print("twitter module imported successfully")
+
+import importlib
 import json
-import yaml
-from datetime import datetime, timedelta, timezone
+from datetime import date
 from pathlib import Path
-from dotenv import load_dotenv
-import tweepy
-from tweepy.errors import TooManyRequests
+import yaml
 
-# ────────────────────────────────
-# Load credentials & config
-# ────────────────────────────────
-load_dotenv()
-BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN")
+sntwitter = importlib.import_module("snscrape.modules.twitter")
 
-def fetch_tweets(keyword, lang, max_results, days, output_dir):
-    """Fetch tweets for a keyword and handle rate limits gracefully."""
-    client = tweepy.Client(bearer_token=BEARER_TOKEN)
-    end_time = datetime.now(timezone.utc)
-    start_time = end_time - timedelta(days=days)
-
+def fetch_tweets(keyword, max_results, output_dir):
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    fname = f"{output_dir}/{keyword}_{end_time.strftime('%Y%m%d_%H%M')}.jsonl"
+    fname = f"{output_dir}/{keyword}_{date.today()}.jsonl"
 
-    try:
-        tweets = client.search_recent_tweets(
-            query=f"{keyword} lang:{lang} -is:retweet",
-            max_results=max_results,
-            tweet_fields=["id", "text", "author_id", "created_at"],
-            start_time=start_time,
-            end_time=end_time,
-        )
-        with open(fname, "w", encoding="utf-8") as f:
-            for tweet in tweets.data or []:
-                json.dump(tweet.data, f)
-                f.write("\n")
-        print(f"✅ {len(tweets.data or [])} tweets → {fname}")
+    if Path(fname).exists() and Path(fname).stat().st_size > 0:
+        print(f"🟡 Already scraped: {fname}")
+        return
 
-    except TooManyRequests as e:
-        # Extract reset time from headers if available
-        reset_timestamp = int(e.response.headers.get("x-rate-limit-reset", 0))
-        wait_sec = max(0, reset_timestamp - time.time()) + 10
-        wait_min = int(wait_sec // 60)
-        print(f"⚠️  Rate limit reached. Sleeping for ~{wait_min} min ({int(wait_sec)} s)…")
-        time.sleep(wait_sec)
-        return fetch_tweets(keyword, lang, max_results, days, output_dir)
+    tweets = []
+    for i, tweet in enumerate(sntwitter.TwitterSearchScraper(f"{keyword} lang:en").get_items()):
+        if i >= max_results:
+            break
+        tweets.append({
+            "id": tweet.id,
+            "date": tweet.date.isoformat(),
+            "content": tweet.content,
+            "username": tweet.user.username
+        })
 
-    except Exception as e:
-        print(f"❌ Error fetching '{keyword}': {e}")
-
-    return fname
+    with open(fname, "w", encoding="utf-8") as f:
+        for t in tweets:
+            json.dump(t, f)
+            f.write("\n")
+    print(f"✅ Saved {len(tweets)} tweets → {fname}")
 
 
 if __name__ == "__main__":
     with open("configs/config.yml") as c:
         cfg = yaml.safe_load(c)
-
     for kw in cfg["keywords"]:
-        fetch_tweets(
-            keyword=kw,
-            lang=cfg["lang"],
-            max_results=cfg["max_results"],
-            days=cfg["days"],
-            output_dir=cfg["output_dir"],
-        )
-        # Wait between keywords to stay below per-minute limits
-        print("⏳ Waiting 60 s before next keyword…")
-        time.sleep(60)
+        fetch_tweets(kw, cfg["max_results"], cfg["output_dir"])
 
