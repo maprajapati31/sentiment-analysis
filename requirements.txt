@@ -1,0 +1,7 @@
+tweepy
+python-dotenv
+pyyaml
+black
+ruff
+pytest
+
