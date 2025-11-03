@@ -1,0 +1,21 @@
+# ---- React Frontend ----
+FROM node:20-alpine
+
+WORKDIR /app
+
+# copy package files first (for caching)
+COPY frontend/package*.json ./
+
+# install dependencies
+RUN npm install
+
+# copy rest of the code
+COPY frontend/ .
+
+# build the production version
+RUN npm run build
+
+# serve using vite preview (or any static server)
+EXPOSE 5173
+CMD ["npm", "run", "preview", "--", "--host"]
+
